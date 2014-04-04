@@ -24,4 +24,4 @@ def test_feature_extractor():
     assert type(y_train) == np.ndarray, "target object should np.darray"
     assert len(X_train) == len(y_train), "n_samples should be equal to n_labels"
     assert X_train.shape[1] == X_test.shape[1], "n_features should be same on train & test"
-    assert X_train.shape[1] == len(X_train[0]), "n_features should be equal to len() of featureset"
+    assert X_train.shape[1] == len(X_train[0]), "n_features should be equal to len() of feature set"
