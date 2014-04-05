@@ -6,7 +6,7 @@ from ml.mywork import task1
 
 def test_process():
     test_file = "test/test_ml_task1_data.txt"
-    fd, sentences = task1.process(f=test_file)
+    fd, sentences, tokens = task1.process(f=test_file)
     assert len(sentences) == 10, "correct len() of processed data"
     assert fd != None, "FreqDist should not be None"
     assert ['and', 'for', 'it'] not in fd.keys(), "stopwords should be removed"
@@ -14,7 +14,7 @@ def test_process():
 
 def test_get_popular_term():
     test_file = "test/test_ml_task1_data.txt"
-    fd, sentences = task1.process(f=test_file)
+    fd, sentences, tokens = task1.process(f=test_file)
     # TODO: test to check if exception is raised for no argument
 
     mpt = task1.get_most_popular_term(fd)
@@ -25,7 +25,7 @@ def test_get_popular_term():
 
 def test_get_types_of_guitar():
     test_file = "test/test_ml_task1_data.txt"
-    fd, sentences = task1.process(f=test_file)
+    fd, sentences, tokens = task1.process(f=test_file)
 
     C = task1.get_types_of_guitar(sentences)
     assert type(C) == collections.Counter, "should be a tuple"

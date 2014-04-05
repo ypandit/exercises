@@ -16,7 +16,7 @@ import collections
 
 from nltk.tokenize.punkt import PunktWordTokenizer
 from nltk.corpus import stopwords
-from nltk import FreqDist
+from nltk import FreqDist, BigramAssocMeasures, BigramCollocationFinder
 
 
 def process(f):
@@ -30,12 +30,14 @@ def process(f):
     :param f: Input file with a deal per line
     """
     fd = FreqDist()
+    tokens = []
     sentences = [line.strip() for line in open(f, 'r').readlines()]
     for line in sentences:
         for word in PunktWordTokenizer().tokenize(line.lower()):
             if word not in set(stopwords.words('english')) and word not in set(string.punctuation):
+                tokens.append(word)
                 fd.inc(word)
-    return fd, sentences
+    return fd, sentences, tokens
 
 
 def get_most_popular_term(freq_dist):
@@ -93,9 +95,33 @@ def get_types_of_guitar(sentences):
     return collections.Counter(found)
 
 
+def get_types_of_guitar_bigrams(tokens):
+    """
+    Returns bigrams by co-occurrence for guitar types
+
+    :param tokens:
+    :return:defaultdict()
+    """
+    tokens = [token for token in tokens if not any(t.isdigit() for t in token)]
+
+    bgm = BigramAssocMeasures()
+    finder = BigramCollocationFinder.from_words(tokens)
+    guitar_filter = lambda *w: 'guitar' not in w
+    finder.apply_freq_filter(2)
+    finder.apply_ngram_filter(guitar_filter)
+
+    scored = finder.score_ngrams(bgm.pmi)
+    prefix_keys = collections.defaultdict(list)
+    for key, scores in scored:
+        prefix_keys[key[1]].append((key[0], scores))
+    for key in prefix_keys:
+        prefix_keys[key].sort(key=lambda x: -x[1])
+    return prefix_keys
+
+
 if __name__ == "__main__":
     deals_file = '../data/deals.txt'
-    fd, sentences = process(deals_file)
+    fd, sentences, tokens = process(deals_file)
 
     mpt = get_most_popular_term(fd)
     print "Most popular term: {0}, freq={1}".format(mpt[0], mpt[1])
@@ -106,3 +132,7 @@ if __name__ == "__main__":
     C = get_types_of_guitar(sentences)
     print "Types of guitar: {0}".format(len(C))
     print C
+
+    bg = get_types_of_guitar_bigrams(tokens)
+    print "Types of guitar (bigrams): {0}".format(len(bg))
+    print bg['guitar'][:10]
