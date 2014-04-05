@@ -58,6 +58,7 @@ def feature_extractor(data, scale=False, n_best=50):
     """
     Tf-Idf based feature extraction. Stopwords are removed before transformation.
 
+    :param n_best: int for # best features to be selected. Default 50
     :param data: dict() with keys: train/test
     :param scale: Boolean whether to normalize/scale feature matrix. Default False
     :return: np.darray, np.darray. np.darray
