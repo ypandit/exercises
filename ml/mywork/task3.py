@@ -14,19 +14,20 @@ Also, provide comments on:
     - How did you test your classifier?
 
 """
+from sklearn.cross_validation import StratifiedKFold
 
 from sklearn.datasets.base import Bunch
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.feature_extraction.text import TfidfVectorizer
 from nltk.corpus import stopwords
-from sklearn.cross_validation import StratifiedKFold
-from numpy import array, linspace
+# from sklearn.cross_validation import cross_val_score
+from numpy import array, linspace, interp
 from sklearn import svm, preprocessing
 import pylab as pl
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_curve, auc
-from scipy import interp
 
 
 def load_data(f, subset, target=None, df=None):
@@ -54,7 +55,7 @@ def load_data(f, subset, target=None, df=None):
     return df
 
 
-def feature_extractor(data, scale=False):
+def feature_extractor(data, scale=False, n_best=50):
     """
     Tf-Idf based feature extraction. Stopwords are removed before transformation.
 
@@ -66,6 +67,10 @@ def feature_extractor(data, scale=False):
     X_train = array(vectorizer.fit_transform(data['train'].data).toarray())
     y_train = array(data['train'].target)
     X_test = array(vectorizer.transform(data['test'].data).toarray())
+
+    ch2 = SelectKBest(chi2, k=n_best)
+    X_train = ch2.fit_transform(X_train, y_train)
+    X_test = ch2.transform(X_test)
     if scale:
         X_train = preprocessing.scale(X_train)
         X_test = preprocessing.scale(X_test)
@@ -82,6 +87,11 @@ def train(X_train, y_train):
     """
     # clf = svm.LinearSVC(C=0.65)
     clf = LogisticRegression(C=1.0, penalty='l2')
+
+    # cv = 10
+    # score = cross_val_score(clf, X_train, y_train, cv=cv)
+    # print "Accuracy: {0} (+/- {1})".format(score.mean(), score.std() * 2)
+
     clf.fit(X_train, y_train)
     return clf
 
@@ -94,7 +104,7 @@ def test(classifier, X_test):
 def classification_perf(X, y):
     """
     Function to compare different classifier. Runs k-fold classification and plots mean (AUC) ROC
-    The more the AUC the higher the tru-positive rate for the classifier
+    The higher the AUC the higher the true-positive rate for the classifier
 
     :param X: np.darray object for feature set
     :param y: np.darray object for target labels
@@ -112,9 +122,9 @@ def classification_perf(X, y):
     pl.figure(figsize=(12, 12))
     pl.subplots_adjust(bottom=.2, top=.95)
 
+    folds = 5
+    cv = StratifiedKFold(y_train, n_folds=folds)
     for index, (name, classifier) in enumerate(classifiers.iteritems()):
-        folds = 5
-        cv = StratifiedKFold(y_train, n_folds=folds)
         cl_mean_tpr = 0.0
         cl_mean_fpr = linspace(0, 1, 100)
         for i, (train, test) in enumerate(cv):
@@ -151,7 +161,7 @@ if __name__ == "__main__":
     assert len(test_data.data) == 58
 
     cache = {'train': train_data, 'test': test_data}
-    X_train, y_train, X_test = feature_extractor(cache, scale=False)
+    X_train, y_train, X_test = feature_extractor(cache, scale=False, n_best=100)
 
     # classification_perf(X_train, y_train)
     classifier = train(X_train, y_train)
