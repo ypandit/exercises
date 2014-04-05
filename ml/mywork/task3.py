@@ -25,9 +25,8 @@ from nltk.corpus import stopwords
 # from sklearn.cross_validation import cross_val_score
 from numpy import array, linspace, interp
 from sklearn import svm, preprocessing
-import pylab as pl
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, accuracy_score
 
 
 def load_data(f, subset, target=None, df=None):
@@ -106,9 +105,19 @@ def classification_perf(X, y):
     Function to compare different classifier. Runs k-fold classification and plots mean (AUC) ROC
     The higher the AUC the higher the true-positive rate for the classifier
 
+    To test the performance of a supervised classifier there should be a gold-standard dataset
+    where the samples are labelled. Since we do not have that in this case, we will used cross-fold validation
+    on the train data to test the performance of the classifier.
+
+    We are looking at the performance of 6 classifiers with 10-fold cross validation.
+    The best one so far has been LogisticRegression(C=1.0, penalty='l2'). 
+    Please take a look at the ROC plots
+
     :param X: np.darray object for feature set
     :param y: np.darray object for target labels
     """
+    import pylab as pl
+
     classifiers = {'L1 LogReg': LogisticRegression(C=1.0, penalty='l1'),
                    'L2 LogReg': LogisticRegression(C=1.0, penalty='l2'),
                    'LinearSVC': svm.SVC(kernel='linear', C=0.65, probability=True, random_state=0),
@@ -122,21 +131,26 @@ def classification_perf(X, y):
     pl.figure(figsize=(12, 12))
     pl.subplots_adjust(bottom=.2, top=.95)
 
-    folds = 5
+    folds = 10
     cv = StratifiedKFold(y_train, n_folds=folds)
     for index, (name, classifier) in enumerate(classifiers.iteritems()):
         cl_mean_tpr = 0.0
         cl_mean_fpr = linspace(0, 1, 100)
+        cl_accuracy = 0
         for i, (train, test) in enumerate(cv):
-            probas_ = classifier.fit(X[train], y[train]).predict_proba(X[test])
+            classifier.fit(X[train], y[train])
+            probas_ = classifier.predict_proba(X[test])
+            y_pred = classifier.predict(X[test])
+            cl_accuracy += accuracy_score(y[test], y_pred)
             fpr, tpr, thresholds = roc_curve(y[test], probas_[:, 1])
             cl_mean_tpr += interp(cl_mean_fpr, fpr, tpr)
             cl_mean_tpr[0] = 0.0
         cl_mean_tpr /= len(cv)
+        cl_accuracy /= len(cv)
         cl_mean_tpr[-1] = 1.0
         mean_auc = auc(cl_mean_fpr, cl_mean_tpr)
         pl.plot(cl_mean_fpr, cl_mean_tpr, lw=2,
-                label='%s - Mean ROC (%d folds) (auc = %0.2f)' % (name, folds, mean_auc))
+                label='%s - Mean ROC (auc=%0.2f, acc=%0.2f)' % (name, mean_auc, cl_accuracy))
 
     pl.xlim([-0.05, 1.05])
     pl.ylim([-0.05, 1.05])
@@ -161,7 +175,7 @@ if __name__ == "__main__":
     assert len(test_data.data) == 58
 
     cache = {'train': train_data, 'test': test_data}
-    X_train, y_train, X_test = feature_extractor(cache, scale=False, n_best=100)
+    X_train, y_train, X_test = feature_extractor(cache, scale=True, n_best=50)
 
     # classification_perf(X_train, y_train)
     classifier = train(X_train, y_train)
