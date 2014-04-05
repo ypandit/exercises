@@ -16,11 +16,17 @@ Also, provide comments on:
 """
 
 from sklearn.datasets.base import Bunch
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from nltk.corpus import stopwords
-from sklearn.cross_validation import cross_val_score
-from numpy import array
+from sklearn.cross_validation import cross_val_score, StratifiedKFold
+from numpy import array, linspace
 from sklearn import svm, preprocessing
+import pylab as pl
+from sklearn.linear_model import LogisticRegression, SGDClassifier
+from sklearn.metrics import roc_curve, auc
+from scipy import interp
 
 
 def load_data(f, subset, target=None, df=None):
@@ -66,7 +72,7 @@ def feature_extractor(data, scale=False):
     return X_train, y_train, X_test
 
 
-def train(X_train, y_train, verbose=True):
+def train(classifier, X_train, y_train, verbose=True):
     clf = svm.LinearSVC(C=0.65)
     cv = 10
     scores = cross_val_score(clf, X_train, y_train, cv=cv)
@@ -79,6 +85,48 @@ def train(X_train, y_train, verbose=True):
 
 def test(classifier, X_test):
     pass
+
+
+def classification_perf(X, y):
+    classifiers = {'L1 LogReg': LogisticRegression(C=1.0, penalty='l1'),
+                   'L2 LogReg': LogisticRegression(C=1.0, penalty='l2'),
+                   'LinearSVC': svm.SVC(kernel='linear', C=0.65, probability=True, random_state=0),
+                   # 'GridSearchCV': grid_search.GridSearchCV(svm.SVC(), [{'kernel':('linear', 'rbf'), 'C':[1, 10]}])}
+                   'DTree': DecisionTreeClassifier(max_depth=None, min_samples_split=1, random_state=0),
+                   'RForest': RandomForestClassifier(n_estimators=10, max_depth=None, min_samples_split=1,
+                                                     random_state=0),
+                   # 'SGD': SGDClassifier(),
+                   'ExtraTree': ExtraTreesClassifier(n_estimators=10, max_depth=None, min_samples_split=1,
+                                                     random_state=0)}
+
+    n_classifiers = len(classifiers)
+
+    pl.figure(figsize=(3 * 2, n_classifiers * 2))
+    pl.subplots_adjust(bottom=.2, top=.95)
+
+    for index, (name, classifier) in enumerate(classifiers.iteritems()):
+        folds = 3
+        cv = StratifiedKFold(y_train, n_folds=folds)
+        cl_mean_tpr = 0.0
+        cl_mean_fpr = linspace(0, 1, 100)
+        cl_all_tpr = []
+        for i, (train, test) in enumerate(cv):
+            probas_ = classifier.fit(X[train], y[train]).predict_proba(X[test])
+            fpr, tpr, thresholds = roc_curve(y[test], probas_[:, 1])
+            cl_mean_tpr += interp(cl_mean_fpr, fpr, tpr)
+            cl_mean_tpr[0] = 0.0
+        cl_mean_tpr /= len(cv)
+        cl_mean_tpr[-1] = 1.0
+        mean_auc = auc(cl_mean_fpr, cl_mean_tpr)
+        pl.plot(cl_mean_fpr, cl_mean_tpr, lw=2, label='%s - Mean ROC (%d) (area = %0.2f)' % (name, folds, mean_auc))
+
+    pl.xlim([-0.05, 1.05])
+    pl.ylim([-0.05, 1.05])
+    pl.xlabel('False Positive Rate')
+    pl.ylabel('True Positive Rate')
+    pl.title('ROC for deals\' classifier')
+    pl.legend(loc="lower right")
+    pl.show()
 
 
 if __name__ == "__main__":
@@ -97,5 +145,4 @@ if __name__ == "__main__":
     cache = {'train': train_data, 'test': test_data}
     X_train, y_train, X_test = feature_extractor(cache, scale=False)
 
-    classifier = train(X_train, y_train)
-    test(classifier, X_test)
+    classification_perf(X_train, y_train)
