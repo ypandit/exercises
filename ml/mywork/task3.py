@@ -20,11 +20,11 @@ from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from nltk.corpus import stopwords
-from sklearn.cross_validation import cross_val_score, StratifiedKFold
+from sklearn.cross_validation import StratifiedKFold
 from numpy import array, linspace
 from sklearn import svm, preprocessing
 import pylab as pl
-from sklearn.linear_model import LogisticRegression, SGDClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_curve, auc
 from scipy import interp
 
@@ -72,44 +72,51 @@ def feature_extractor(data, scale=False):
     return X_train, y_train, X_test
 
 
-def train(classifier, X_train, y_train, verbose=True):
-    clf = svm.LinearSVC(C=0.65)
-    cv = 10
-    scores = cross_val_score(clf, X_train, y_train, cv=cv)
-    if verbose:
-        print "Sample size: {0}".format(len(X_train))
-        print "Cross-validation: {0} folds".format(cv)
-        print "Accuracy: {0} (+/- {1})".format(scores.mean(), scores.std() * 2)
+def train(X_train, y_train):
+    """
+    Selecting the best classifier from the classification performance test
+
+    :param X_train: np.array feature set
+    :param y_train: np.darray labels
+    :return: Object of trained classifier
+    """
+    # clf = svm.LinearSVC(C=0.65)
+    clf = LogisticRegression(C=1.0, penalty='l2')
+    clf.fit(X_train, y_train)
     return clf
 
 
 def test(classifier, X_test):
-    pass
+    y_pred = classifier.predict(X_test)
+    return y_pred
 
 
 def classification_perf(X, y):
+    """
+    Function to compare different classifier. Runs k-fold classification and plots mean (AUC) ROC
+    The more the AUC the higher the tru-positive rate for the classifier
+
+    :param X: np.darray object for feature set
+    :param y: np.darray object for target labels
+    """
     classifiers = {'L1 LogReg': LogisticRegression(C=1.0, penalty='l1'),
                    'L2 LogReg': LogisticRegression(C=1.0, penalty='l2'),
                    'LinearSVC': svm.SVC(kernel='linear', C=0.65, probability=True, random_state=0),
-                   # 'GridSearchCV': grid_search.GridSearchCV(svm.SVC(), [{'kernel':('linear', 'rbf'), 'C':[1, 10]}])}
+                   # 'GridSearchCV': grid_search.GridSearchCV(svm.SVC(), [{'kernel': ('linear', 'rbf'), 'C': [1, 10]}]),
                    'DTree': DecisionTreeClassifier(max_depth=None, min_samples_split=1, random_state=0),
                    'RForest': RandomForestClassifier(n_estimators=10, max_depth=None, min_samples_split=1,
                                                      random_state=0),
-                   # 'SGD': SGDClassifier(),
                    'ExtraTree': ExtraTreesClassifier(n_estimators=10, max_depth=None, min_samples_split=1,
                                                      random_state=0)}
 
-    n_classifiers = len(classifiers)
-
-    pl.figure(figsize=(3 * 2, n_classifiers * 2))
+    pl.figure(figsize=(12, 12))
     pl.subplots_adjust(bottom=.2, top=.95)
 
     for index, (name, classifier) in enumerate(classifiers.iteritems()):
-        folds = 3
+        folds = 5
         cv = StratifiedKFold(y_train, n_folds=folds)
         cl_mean_tpr = 0.0
         cl_mean_fpr = linspace(0, 1, 100)
-        cl_all_tpr = []
         for i, (train, test) in enumerate(cv):
             probas_ = classifier.fit(X[train], y[train]).predict_proba(X[test])
             fpr, tpr, thresholds = roc_curve(y[test], probas_[:, 1])
@@ -118,7 +125,8 @@ def classification_perf(X, y):
         cl_mean_tpr /= len(cv)
         cl_mean_tpr[-1] = 1.0
         mean_auc = auc(cl_mean_fpr, cl_mean_tpr)
-        pl.plot(cl_mean_fpr, cl_mean_tpr, lw=2, label='%s - Mean ROC (%d) (area = %0.2f)' % (name, folds, mean_auc))
+        pl.plot(cl_mean_fpr, cl_mean_tpr, lw=2,
+                label='%s - Mean ROC (%d folds) (auc = %0.2f)' % (name, folds, mean_auc))
 
     pl.xlim([-0.05, 1.05])
     pl.ylim([-0.05, 1.05])
@@ -145,4 +153,7 @@ if __name__ == "__main__":
     cache = {'train': train_data, 'test': test_data}
     X_train, y_train, X_test = feature_extractor(cache, scale=False)
 
-    classification_perf(X_train, y_train)
+    # classification_perf(X_train, y_train)
+    classifier = train(X_train, y_train)
+    y_pred = test(classifier, X_test)
+    print y_pred
