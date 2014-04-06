@@ -41,7 +41,8 @@ def load_data(f, subset, target=None, df=None):
     """
     if subset == 'train' and target is None:
         raise ValueError("target not specified for train")
-    docs = [w.strip().lower() for w in open(f, 'r').readlines()]
+    fh = open(f, 'r')
+    docs = [w.strip().lower() for w in fh.readlines()]
     if subset == 'test':
         labels = None
     else:
@@ -51,6 +52,7 @@ def load_data(f, subset, target=None, df=None):
         df.target.extend(labels)
     else:
         df = Bunch(data=docs, target=labels)
+    fh.close()
     return df
 
 

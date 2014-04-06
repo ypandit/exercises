@@ -31,12 +31,14 @@ def process(f):
     """
     fd = FreqDist()
     tokens = []
-    sentences = [line.strip() for line in open(f, 'r').readlines()]
+    fh = open(f, 'r')
+    sentences = [line.strip() for line in fh.readlines()]
     for line in sentences:
         for word in PunktWordTokenizer().tokenize(line.lower()):
             if word not in set(stopwords.words('english')) and word not in set(string.punctuation):
                 tokens.append(word)
                 fd.inc(word)
+    fh.close()
     return fd, sentences, tokens
 
 
