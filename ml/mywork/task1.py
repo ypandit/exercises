@@ -19,7 +19,7 @@ from nltk.corpus import stopwords
 from nltk import FreqDist, BigramAssocMeasures, BigramCollocationFinder
 
 
-def process(f):
+def process(f, return_tokens=True, return_freqdist=True):
     """
     Function to process deals data.
     Splits text into sentences. FreqDist is incremented from tokenization.
@@ -34,10 +34,14 @@ def process(f):
     fh = open(f, 'r')
     sentences = [line.strip() for line in fh.readlines()]
     for line in sentences:
+        t = []
         for word in PunktWordTokenizer().tokenize(line.lower()):
             if word not in set(stopwords.words('english')) and word not in set(string.punctuation):
-                tokens.append(word)
-                fd.inc(word)
+                if return_tokens:
+                    t.append(word)
+                if return_freqdist:
+                    fd.inc(word)
+        tokens.append(t)
     fh.close()
     return fd, sentences, tokens
 
@@ -104,7 +108,12 @@ def get_types_of_guitar_bigrams(tokens):
     :param tokens:
     :return:defaultdict()
     """
-    tokens = [token for token in tokens if not any(t.isdigit() for t in token)]
+    T = []
+    for token in tokens:
+        for tok in token:
+            if not any(t.isdigit() for t in tok):
+                T.append(tok)
+    tokens = T
 
     bgm = BigramAssocMeasures()
     finder = BigramCollocationFinder.from_words(tokens)
@@ -127,13 +136,16 @@ if __name__ == "__main__":
 
     mpt = get_most_popular_term(fd)
     print "Most popular term: {0}, freq={1}".format(mpt[0], mpt[1])
+    print "----------"
 
     lpt = get_least_popular_term(fd)
     print "Least popular term: {0}, freq={1}".format(lpt[0], lpt[1])
+    print "----------"
 
     C = get_types_of_guitar(sentences)
     print "Types of guitar: {0}".format(len(C))
     print C
+    print "----------"
 
     bg = get_types_of_guitar_bigrams(tokens)
     print "Types of guitar (bigrams): {0}".format(len(bg))
