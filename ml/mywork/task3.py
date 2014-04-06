@@ -167,15 +167,12 @@ def classification_perf(X, y):
 if __name__ == "__main__":
     good_deals_file = '../data/good_deals.txt'
     train_data = load_data(target=1, f=good_deals_file, subset='train')
-    assert len(train_data.data) == 30
 
     bad_deals_file = '../data/bad_deals.txt'
     train_data = load_data(df=train_data, target=0, f=bad_deals_file, subset='train')
-    assert len(train_data.data) == 60
 
     test_file = '../data/test_deals.txt'
     test_data = load_data(f=test_file, subset='test')
-    assert len(test_data.data) == 58
 
     cache = {'train': train_data, 'test': test_data}
     X_train, y_train, X_test = feature_extractor(cache, scale=True, n_best=50)
