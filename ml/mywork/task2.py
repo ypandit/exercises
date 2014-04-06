@@ -8,13 +8,18 @@ Building on task 1, we now want to start to understand the relationships to help
 2. What topics exist within the deals?
 
 """
+
+import os
+
+from gensim.corpora import Dictionary, MmCorpus
+from gensim.models import LdaModel
 from scipy.cluster.vq import kmeans
 from scipy.spatial.distance import cdist, pdist
 from numpy import min, sum, arange
 from sklearn.decomposition import TruncatedSVD, RandomizedPCA
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from ml.mywork import task3
+from ml.mywork import task3, task1
 
 
 def feature_extractor(data, n_samples=None, min_df=0.02, max_df=0.98):
@@ -58,8 +63,7 @@ def find_best_k(X):
     ax = fig.add_subplot(111)
     ax.plot(k_range, between_ss2 / total_ss2 * 100, 'b*-')
     ax.plot(k_range[k], between_ss2[k] / total_ss2 * 100, marker='o', markersize=12, markeredgewidth=2,
-            markeredgecolor='r',
-            markerfacecolor='None')
+            markeredgecolor='r', markerfacecolor='None')
     ax.set_ylim((0, 100))
     ax.xaxis.set_ticks(arange(1, k_max, 1))
 
@@ -115,20 +119,64 @@ def get_topics_lsa(X, features, n_topics=10, n_words=10):
     return topics
 
 
-def get_topics_lda(X):
-    pass
+def get_topics_lda(tokens, n_topics=10):
+    """
+
+    :param tokens:
+    :param n_topics:
+    :return:
+    """
+    dict_file = 'resources/deals.dict'
+    if not os.path.isfile(dict_file):
+        print "Dictionary file does not exist. Creating one"
+        dictionary = Dictionary(tokens)
+        freq1 = [id for id, freq in dictionary.dfs.iteritems() if freq == 1]
+        dictionary.filter_tokens(freq1)
+        dictionary.compactify()
+        dictionary.save(dict_file)
+    dictionary = Dictionary.load(dict_file)
+    # print dictionary
+
+    corpus_file = 'resources/deals.mm'
+    if not os.path.isfile(corpus_file):
+        print "Corpus file does not exist. Creating one"
+        corpus = [dictionary.doc2bow(token) for token in tokens]
+        MmCorpus.serialize(corpus_file, corpus)
+    mm = MmCorpus(corpus_file)
+    # print mm
+    # tfidf = TfidfModel(mm)
+    # corpus_tfidf = tfidf[mm]
+
+    lda = LdaModel(corpus=mm, id2word=dictionary, num_topics=n_topics, update_every=1, chunksize=1000,
+                   passes=1)
+    topics = []
+    for i in range(0, n_topics):
+        words = lda.print_topic(i).split('+')
+        topic = []
+        for word in words:
+            score, w = word.split('*')
+            topic.append((w, score))
+        topics.append(topic)
+    return topics
 
 
 if __name__ == "__main__":
     deals_file = '../data/deals.txt'
     data = task3.load_data(f=deals_file, subset='test')
 
-    X, features = feature_extractor(data, min_df=0.02, max_df=0.90, n_samples=len(data.data))
+    X, features = feature_extractor(data, min_df=0.02, max_df=0.98, n_samples=len(data.data))
     topics = get_topics_lsa(X, features, n_topics=10, n_words=10)
-    print "Following {0} topics exist in the data:".format(len(topics))
+    print "Following {0} topics (LSA) exist in the data:".format(len(topics))
     for i in range(0, len(topics)):
         print "Topic #{0} - {1}".format(i, ", ".join(topics[i]))
     #   print "Topic #{0} - {1}".format(i, ", ".join(sorted(topics[i])))
+    print "----------"
+
+    fd, sentences, tokens = task1.process(deals_file, return_freqdist=False)
+    lda = get_topics_lda(tokens)
+    print "Following {0} topics (LDA) exist in the data:".format(len(lda))
+    for i in range(0, len(lda)):
+        print "Topic #{0} - {1}".format(i, lda[i])
     print "----------"
 
     n_samples = 20000
