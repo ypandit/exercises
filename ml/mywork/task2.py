@@ -9,14 +9,41 @@ Building on task 1, we now want to start to understand the relationships to help
 
 """
 
+from sklearn.cluster import KMeans
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import Normalizer
+from numpy import bincount
 
 from ml.mywork import task3
 
 
-def get_groups():
-    pass
+# TODO: Elbow method to select the best number of clusters
+
+def get_groups(data, n_cluster=5, n_topics=30, min_df=0.01, max_df=0.98):
+    """
+    Returns an object of trained KMeans classifier. The number of cluster is
+    given by the argument n_cluster
+    The best number of clusters is selected by the Elbow method
+
+    :param data: Bunch() object for data. Bunch.target is optional
+    :param n_cluster: Number of clusters
+    :param n_topics: Number of topics/components for decomposition
+    :param min_df: Threshold for minimum term frequency. Default 0.02
+    :param max_df: Threshold for maximum term frequency. Default 0.85
+    :return: 
+    """
+    vectorizer = TfidfVectorizer(stop_words='english', min_df=min_df, max_df=max_df, binary=True, use_idf=True,
+                                 smooth_idf=True)
+
+    X = vectorizer.fit_transform(data.data).toarray()
+    tsvd = TruncatedSVD(n_components=n_topics, algorithm='randomized', n_iterations=10, random_state=1)
+    X = tsvd.fit_transform(X)
+    X = Normalizer(copy=False).fit_transform(X)
+
+    kmeans = KMeans(n_clusters=n_cluster, n_init=1, init='random')
+    kmeans.fit(X)
+    return kmeans
 
 
 def get_topics(data, n_topics=10, n_words=10, min_df=0.02, max_df=0.85, n_features=5000):
@@ -54,8 +81,17 @@ if __name__ == "__main__":
     deals_file = '../data/deals.txt'
     data = task3.load_data(f=deals_file, subset='test')
 
-    topics = get_topics(data, n_words=10, n_features=20000, min_df=0.01, max_df=0.80)
+    topics = get_topics(data, n_topics=10, n_words=10, n_features=10000, min_df=0.01, max_df=0.80)
+    print "Following {0} topics exist in the data:".format(len(topics))
     for i in range(0, len(topics)):
         print "Topic #{0} - {1}".format(i, ", ".join(topics[i]))
         # print "Topic #{0} - {1}".format(i, ", ".join(sorted(topics[i])))
 
+    best_k = []
+    for i in range(3, 10):
+        kmeans = get_groups(data, n_cluster=i, n_topics=15, min_df=0.02, max_df=0.80)
+        print bincount(kmeans.labels_)
+        best_k.append(dict(n=i, df=kmeans.inertia_))
+    sorted_best_k = sorted(best_k, key=lambda k: k['df'])
+    print sorted_best_k[0]
+    print  sorted_best_k[-1]
