@@ -8,68 +8,106 @@ Building on task 1, we now want to start to understand the relationships to help
 2. What topics exist within the deals?
 
 """
-
-from sklearn.cluster import KMeans
-from sklearn.decomposition import TruncatedSVD
+from scipy.cluster.vq import kmeans
+from scipy.spatial.distance import cdist, pdist
+from numpy import min, sum, arange
+from sklearn.decomposition import TruncatedSVD, RandomizedPCA
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import Normalizer
-from numpy import bincount
 
 from ml.mywork import task3
 
 
-# TODO: Elbow method to select the best number of clusters
+def feature_extractor(data, n_samples=None, min_df=0.02, max_df=0.98):
+    if n_samples is None:
+        n_samples = len(data.data) / 2
+    vectorizer = TfidfVectorizer(stop_words='english', min_df=min_df, max_df=max_df)
+    X = vectorizer.fit_transform(data.data[:n_samples]).toarray()
+    return X, vectorizer.get_feature_names()
 
-def get_groups(data, n_cluster=5, n_topics=30, min_df=0.01, max_df=0.98):
+
+def find_best_k(X):
+    """
+    Draws a plot based on the Elbow method. Calculates variance for 1..20 clusters.
+    Calcuates the percentage of variance from between-cluster sum of squares and
+    the total sum of squares.
+    k where the change is variance doesn't change much for k+1 is the best for given
+    set of data
+
+    Elbow plot for this dataset with 20000 samples is saved to task2_kmeans_v1.png
+
+    :param X: Feature set
+    """
+    from matplotlib import pyplot as plt
+
+    pca = RandomizedPCA(n_components=2).fit(X)
+    X = pca.transform(X)
+
+    k_max = 20
+    k_range = range(1, k_max + 1)
+    km = [kmeans(X, k) for k in k_range]
+    centroids = [centroid for (centroid, var) in km]
+    d_c = [cdist(X, centroid, 'euclidean') for centroid in centroids]
+    dist = [min(dist, axis=1) for dist in d_c]
+
+    within_ss2 = [sum(d ** 2) for d in dist]  # Total within-cluster sum of squares
+    total_ss2 = sum(pdist(X) ** 2) / X.shape[0]  # The total sum of squares
+    between_ss2 = total_ss2 - within_ss2  # Between cluster sum of squares
+
+    k = 4
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_subplot(111)
+    ax.plot(k_range, between_ss2 / total_ss2 * 100, 'b*-')
+    ax.plot(k_range[k], between_ss2[k] / total_ss2 * 100, marker='o', markersize=12, markeredgewidth=2,
+            markeredgecolor='r',
+            markerfacecolor='None')
+    ax.set_ylim((0, 100))
+    ax.xaxis.set_ticks(arange(1, k_max, 1))
+
+    plt.grid(True)
+    plt.xlabel('Number of clusters')
+    plt.ylabel('Percentage of variance explained (%)')
+    plt.title('Elbow for KMeans clustering')
+    plt.savefig('task2_kmeans_v1.png')
+
+
+def get_groups(X, k=5, n_components=2):
     """
     Returns an object of trained KMeans classifier. The number of cluster is
-    given by the argument n_cluster
-    The best number of clusters is selected by the Elbow method
+    given by the argument k
+    The best number of clusters is selected by the Elbow method (find_best_k)
 
-    :param data: Bunch() object for data. Bunch.target is optional
-    :param n_cluster: Number of clusters
-    :param n_topics: Number of topics/components for decomposition
-    :param min_df: Threshold for minimum term frequency. Default 0.02
-    :param max_df: Threshold for maximum term frequency. Default 0.85
-    :return: 
+    :param X: Feature set
+    :param n_components: Size for decomposition of features. Default 2
+    :param k: Number of clusters. Default 5
+    :return: dict() of kmeans centroids and variance
     """
-    vectorizer = TfidfVectorizer(stop_words='english', min_df=min_df, max_df=max_df, binary=True, use_idf=True,
-                                 smooth_idf=True)
+    # tsvd = TruncatedSVD(n_components=n_topics, algorithm='randomized', n_iterations=10, random_state=1)
+    # X = tsvd.fit_transform(X)
+    # X = Normalizer(copy=False).fit_transform(X)
+    # kmeans = KMeans(n_clusters=n_cluster, n_init=1, init='random')
+    # kmeans.fit(X)
+    # return kmeans
 
-    X = vectorizer.fit_transform(data.data).toarray()
-    tsvd = TruncatedSVD(n_components=n_topics, algorithm='randomized', n_iterations=10, random_state=1)
-    X = tsvd.fit_transform(X)
-    X = Normalizer(copy=False).fit_transform(X)
-
-    kmeans = KMeans(n_clusters=n_cluster, n_init=1, init='random')
-    kmeans.fit(X)
-    return kmeans
+    pca = RandomizedPCA(n_components=n_components).fit(X)
+    X = pca.transform(X)
+    km = kmeans(X, k)
+    return km
 
 
-def get_topics(data, n_topics=10, n_words=10, min_df=0.02, max_df=0.85, n_features=5000):
+def get_topics_lsa(X, features, n_topics=10, n_words=10):
     """
     A "topic" consists of a cluster of words that frequently occur together.
     Here we are performing a latent semantic analysis (LSA) based on tf-idf.
     Not considering the most frequent terms (max_df) since the correlation between them would be
     high and they will show up in most of the topics.
 
-    :param min_df: Threshold for minimum term frequency. Default 0.02
-    :param max_df: Threshold for maximum term frequency. Default 0.85
-    :param n_features: Number of features to be considered. Default 5000
+    :param X: Feature set
+    :param features: Features names for X
     :param n_topics: Number of topics to decompose data to
     :param n_words: Number of words per topics
-    :param data: Bunch() object for data; Bunch.target is optional
     """
 
-    vectorizer = TfidfVectorizer(stop_words='english', min_df=min_df, max_df=max_df, max_features=n_features,
-                                 binary=True, use_idf=False, smooth_idf=False)
-
-    X = vectorizer.fit_transform(data.data).toarray()
-    # X = preprocessing.scale(X)
-    features = vectorizer.get_feature_names()
-
     tm = TruncatedSVD(n_components=n_topics, algorithm='randomized', n_iterations=10, random_state=1).fit(X)
-
     topics = []
     for topic_idx, topic in enumerate(tm.components_):
         words = [features[i] for i in topic.argsort()[:-n_words - 1:-1]]
@@ -77,21 +115,29 @@ def get_topics(data, n_topics=10, n_words=10, min_df=0.02, max_df=0.85, n_featur
     return topics
 
 
+def get_topics_lda(X):
+    pass
+
+
 if __name__ == "__main__":
     deals_file = '../data/deals.txt'
     data = task3.load_data(f=deals_file, subset='test')
 
-    topics = get_topics(data, n_topics=10, n_words=10, n_features=10000, min_df=0.01, max_df=0.80)
+    X, features = feature_extractor(data, min_df=0.02, max_df=0.90, n_samples=len(data.data))
+    topics = get_topics_lsa(X, features, n_topics=10, n_words=10)
     print "Following {0} topics exist in the data:".format(len(topics))
     for i in range(0, len(topics)):
         print "Topic #{0} - {1}".format(i, ", ".join(topics[i]))
-        # print "Topic #{0} - {1}".format(i, ", ".join(sorted(topics[i])))
+    #   print "Topic #{0} - {1}".format(i, ", ".join(sorted(topics[i])))
+    print "----------"
 
-    best_k = []
-    for i in range(3, 10):
-        kmeans = get_groups(data, n_cluster=i, n_topics=15, min_df=0.02, max_df=0.80)
-        print bincount(kmeans.labels_)
-        best_k.append(dict(n=i, df=kmeans.inertia_))
-    sorted_best_k = sorted(best_k, key=lambda k: k['df'])
-    print sorted_best_k[0]
-    print  sorted_best_k[-1]
+    n_samples = 20000
+    X, features = feature_extractor(data, min_df=0.02, max_df=0.98, n_samples=n_samples)
+    # find_best_k(data)
+    print "----------"
+
+    k = 5  # From find_best_k plot
+    kmeans = get_groups(X, k)
+    print "There are {0} groups in the data (based on samples={1})".format(len(kmeans[0]), n_samples)
+    print "Centroids: \n{0}".format(kmeans[0])
+    print "Variance (distortion): {0}".format(kmeans[1])
