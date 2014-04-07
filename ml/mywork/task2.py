@@ -121,10 +121,14 @@ def get_topics_lsa(X, features, n_topics=10, n_words=10):
 
 def get_topics_lda(tokens, n_topics=10):
     """
+    Using the `gensim` package for LDA. 
+    LDA is a little better than LSA as it provides a reasonal mixture of topics (Wikipedia).
+    `gensim` is a package for topic modeling only. So for a particular topic modeling task,
+    it is a lighter option to install and run. Also it can be run distributed and updated over an existing model
 
-    :param tokens:
-    :param n_topics:
-    :return:
+    :param tokens: Preprocessed tokens for faster dictionary building
+    :param n_topics: Number of topics to decompose data to
+    :return: list() of topics
     """
     dict_file = 'resources/deals.dict'
     if not os.path.isfile(dict_file):
