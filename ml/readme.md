@@ -1,5 +1,6 @@
 ML Engineer Exercise
 =========
+[![Build Status](https://travis-ci.org/ypandit/exercises.svg?branch=master)](https://travis-ci.org/ypandit/exercises)
 
 Overview
 --------
