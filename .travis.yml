@@ -5,6 +5,9 @@ before_install:
     - sudo apt-get update -qq
     - sudo apt-get install gfortran libopenblas-dev liblapack-dev
 install: "pip install -r ml/requirements.txt"
+before_script:
+    - python -m nltk.downloader -e -d /home/travis/nltk_data stopwords
+    - python -m nltk.downloader -e -d /home/travis/nltk_data punkt
 notifications:
     email: false
 script: py.test test/test_ml_task*.py -v
